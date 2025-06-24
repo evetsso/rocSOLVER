@@ -1,5 +1,6 @@
 #include <H5Cpp.h>
 
+#include <algorithm>
 #include <memory>
 #include <stdexcept>
 #include <stdio.h>
@@ -51,6 +52,13 @@ int main()
     printf("%llu ", d);
   printf("\n");
 
+  // expecting two squares
+  if(kkrmat_dims.size() != 2 ||tmat_dims.size() != 2 ||
+     kkrmat_dims[0] != kkrmat_dims[1] ||tmat_dims[0] != tmat_dims[1])
+    {
+      throw std::runtime_error("expected two squares");
+    }
+
   // copy data to host memory
   auto kkrmat_data_host = std::make_unique<rocblas_double_complex[]>(kkrmat.getInMemDataSize() / sizeof(rocblas_double_complex));
   auto tmat_data_host = std::make_unique<rocblas_double_complex[]>(tmat.getInMemDataSize() / sizeof(rocblas_double_complex));
@@ -60,17 +68,29 @@ int main()
   tmat.read(tmat_data_host.get(), ztype);
   printf("read tmat successfully\n");
 
+  // padded tmat out to have same number of columns as kkr
+  auto tmat_data_pad_host = std::make_unique<rocblas_double_complex[]>(kkrmat_dims[0] * tmat_dims[0] * sizeof(rocblas_double_complex));
+  std::fill_n(tmat_data_pad_host.get(), kkrmat_dims[0] * tmat_dims[0],
+            rocblas_double_complex{0.0, 0.0});
+  // copy tmat to first part of padded buffer
+  for(hsize_t trow = 0; trow < tmat_dims[0]; ++trow)
+    {
+      std::copy_n(tmat_data_host.get() + trow * tmat_dims[1],
+                  tmat_dims[0],
+                  tmat_data_pad_host.get() + trow * kkrmat_dims[1]);
+    }
+
   gpubuf_t<rocblas_double_complex> kkrmat_data_device;
   gpubuf_t<rocblas_double_complex> tmat_data_device;
   if(kkrmat_data_device.alloc(kkrmat.getInMemDataSize()) != hipSuccess)
     throw std::runtime_error("failed to hipmalloc kkr");
-  if(tmat_data_device.alloc(tmat.getInMemDataSize()) != hipSuccess)
+  if(tmat_data_device.alloc(kkrmat_dims[0] * tmat_dims[0] * sizeof(rocblas_double_complex)) != hipSuccess)
     throw std::runtime_error("failed to hipmalloc t");
 
   // copy to device
   if(hipMemcpy(kkrmat_data_device.data(), kkrmat_data_host.get(), kkrmat.getInMemDataSize(), hipMemcpyHostToDevice) !=hipSuccess)
     throw std::runtime_error("failed to memcpy kkr to device");
-  if(hipMemcpy(tmat_data_device.data(), tmat_data_host.get(), tmat.getInMemDataSize(), hipMemcpyHostToDevice) !=hipSuccess)
+  if(hipMemcpy(tmat_data_device.data(), tmat_data_host.get(), kkrmat_dims[0] * tmat_dims[0] * sizeof(rocblas_double_complex), hipMemcpyHostToDevice) !=hipSuccess)
     throw std::runtime_error("failed to memcpy t to device");
   
   gpubuf_t<rocblas_int> ipiv;
@@ -92,7 +112,7 @@ int main()
                                 kkrmat_dims[1],
                                 ipiv.data(),
                                 tmat_data_device.data(),
-                                tmat_dims[1],
+                                kkrmat_dims[1],
                                 info.data());
 
   rocblas_int info_host;
