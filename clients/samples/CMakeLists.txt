@@ -47,6 +47,15 @@ add_executable(example-c-batched
 add_executable(example-c-strided-batched
   example_strided_batched.c
 )
+add_executable(mp_test
+  mp_test.cpp
+)
+
+find_package(HDF5 REQUIRED COMPONENTS CXX C)
+
+target_compile_options(mp_test PRIVATE ${HDF5_CXX_DEFINITIONS})
+target_include_directories(mp_test PRIVATE ${HDF5_CXX_INCLUDE_DIRS})
+target_link_libraries(mp_test PRIVATE hdf5::hdf5_cpp hdf5::hdf5)
 
 # group sample programs by language
 set(c_samples
@@ -59,6 +68,7 @@ set(c_samples
 set(cpp_samples
   example-cpp-basic
   example-cpp-logging
+  mp_test
 )
 
 # set flags for building the sample programs
@@ -69,7 +79,7 @@ endforeach()
 
 foreach(exe ${cpp_samples})
   set_target_properties(${exe} PROPERTIES
-    CXX_STANDARD 11
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
   )
