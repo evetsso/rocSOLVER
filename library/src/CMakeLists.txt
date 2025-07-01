@@ -384,6 +384,8 @@ add_library(rocsolver
 
 add_library(roc::rocsolver ALIAS rocsolver)
 
+find_package(rocprofiler-sdk-roctx)
+
 target_link_libraries(rocsolver
   PUBLIC
     roc::rocblas
@@ -392,6 +394,7 @@ target_link_libraries(rocsolver
     roc::rocprim
     $<$<PLATFORM_ID:Linux>:--rtlib=compiler-rt>
     $<$<PLATFORM_ID:Linux>:--unwindlib=libgcc>
+    rocprofiler-sdk-roctx::rocprofiler-sdk-roctx-shared-library
 )
 if(NOT USE_HIPCXX)
   target_link_libraries(rocsolver PRIVATE hip::device)

@@ -37,6 +37,9 @@
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
 
+#include <rocprofiler-sdk-roctx/roctx.h>
+#include <string>
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 /** Constants for inner block size of getrf **/
@@ -701,14 +704,18 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
         blk = -blk;
     }
 
+    roctxMark("before main loop");
     // MAIN LOOP
     for(I j = 0; j < dim; j += blk)
     {
         jb = std::min(dim - j, blk);
 
+        std::string iter_str = std::to_string(j);
+
         if(pivot || panel)
         {
             // factorize outer block panel
+            roctxMark(std::string("getrf_panelLU begin " + iter_str).c_str());
             getrf_panelLU<BATCHED, STRIDED, T>(handle, m - j, jb, n, A, shiftA + j * inca, inca,
                                                lda, strideA, ipiv, shiftP + j, strideP, info,
                                                batch_count, pivot, scalars, work1, work2, work3,
@@ -736,6 +743,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
         nn = n - nextpiv; //size for the matrix update
         if(nextpiv < n)
         {
+            roctxMark(std::string("trsm_lower begin " + iter_str).c_str());
             rocsolver_trsm_lower<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_unit, jb, nn, A,
                 shiftA + idx2D(j, j, inca, lda), inca, lda, strideA, A,
@@ -744,6 +752,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
 
             if(nextpiv < m)
             {
+                roctxMark(std::string("rocsolver_gemm begin " + iter_str).c_str());
                 rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, mm, nn, jb,
                                &minone, A, shiftA + idx2D(nextpiv, j, inca, lda), inca, lda,
                                strideA, A, shiftA + idx2D(j, nextpiv, inca, lda), inca, lda,
@@ -752,6 +761,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
             }
         }
     }
+    roctxMark("end main loop");
 
     rocblas_set_pointer_mode(handle, old_mode);
     return rocblas_status_success;
