@@ -154,6 +154,9 @@ int main(int argc, char** argv)
         printf("trial %zu info=%d status=%d\n", i, info_host, status);
     }
 
+    rocblas_destroy_handle(handle);
+    handle = nullptr;
+
     printf("Execution times (ms):");
     for(auto t : gpu_time)
     {
