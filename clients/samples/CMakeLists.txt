@@ -52,10 +52,11 @@ add_executable(mp_test
 )
 
 find_package(HDF5 REQUIRED COMPONENTS CXX C)
+find_package(OpenMP REQUIRED)
 
 target_compile_options(mp_test PRIVATE ${HDF5_CXX_DEFINITIONS})
 target_include_directories(mp_test PRIVATE ${HDF5_CXX_INCLUDE_DIRS})
-target_link_libraries(mp_test PRIVATE hdf5::hdf5_cpp hdf5::hdf5)
+target_link_libraries(mp_test PRIVATE hdf5::hdf5_cpp hdf5::hdf5 OpenMP::OpenMP_CXX)
 
 # group sample programs by language
 set(c_samples

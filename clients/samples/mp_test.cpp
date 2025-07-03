@@ -16,6 +16,11 @@
 #include <dlfcn.h>
 #include <link.h>
 
+struct VectorNorms
+{
+    double l_2 = 0.0, l_inf = 0.0;
+};
+
 int main(int argc, char** argv)
 {
     std::string ref_lib_path = argv[1];
@@ -120,12 +125,17 @@ int main(int argc, char** argv)
     stop.alloc();
     std::vector<float> ref_gpu_time(ntrial);
     std::vector<float> dev_gpu_time(ntrial);
+
+    std::unique_ptr<rocblas_double_complex[]> ref_output;
+    std::unique_ptr<rocblas_double_complex[]> dev_output;
+
     for(size_t i = 0; i < ntrial; ++i)
     {
         for(auto run_ref : {true, false})
         {
             auto zgesv = run_ref ? ref_zgesv : dev_zgesv;
             auto& gpu_time = run_ref ? ref_gpu_time : dev_gpu_time;
+            auto& output = run_ref ? ref_output : dev_output;
 
             // copy to device
             if(hipMemcpy(kkrmat_data_device.data(), kkrmat_data_host.get(),
@@ -170,11 +180,37 @@ int main(int argc, char** argv)
                 throw std::runtime_error("failed to copy info back");
 
             printf("%s trial %zu info=%d status=%d\n", run_ref ? "ref" : "dev", i, info_host, status);
+
+            if(!output)
+            {
+                output = std::make_unique<rocblas_double_complex[]>(
+                    kkrmat.getInMemDataSize() / sizeof(rocblas_double_complex));
+                // copy results back
+                if(hipMemcpy(output.get(), kkrmat_data_device.data(), kkrmat.getInMemDataSize(),
+                             hipMemcpyDeviceToHost)
+                   != hipSuccess)
+                    throw std::runtime_error("failed to memcpy output");
+            }
         }
     }
 
     rocblas_destroy_handle(handle);
     handle = nullptr;
+
+    // compare results
+    double l_inf;
+    double l_2;
+#pragma omp parallel for reduction(max : l_inf) reduction(+ : l_2)
+    for(size_t i = 0; i < kkrmat.getInMemDataSize() / sizeof(rocblas_double_complex); ++i)
+    {
+        double rdiff = std::abs(ref_output[i].x - dev_output[i].x);
+        l_inf = std::max(rdiff, l_inf);
+        double idiff = std::abs(ref_output[i].y - dev_output[i].y);
+        l_inf = std::max(idiff, l_inf);
+        l_2 += rdiff * rdiff + idiff * idiff;
+    }
+    l_2 = sqrt(l_2);
+    printf("Diff L2=%e, L-inf=%e\n", l_2, l_inf);
 
     for(auto run_ref : {true, false})
     {
