@@ -198,8 +198,8 @@ int main(int argc, char** argv)
     handle = nullptr;
 
     // compare results
-    double l_inf;
-    double l_2;
+    double l_inf = 0.0;
+    double l_2 = 0.0;
 #pragma omp parallel for reduction(max : l_inf) reduction(+ : l_2)
     for(size_t i = 0; i < kkrmat.getInMemDataSize() / sizeof(rocblas_double_complex); ++i)
     {
