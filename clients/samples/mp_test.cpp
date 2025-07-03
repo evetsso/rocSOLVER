@@ -13,9 +13,21 @@
 #include "hip_object_wrapper.h"
 #include "rocsolver/rocsolver.h"
 
+#include <dlfcn.h>
+#include <link.h>
+
 int main(int argc, char** argv)
 {
-    size_t ntrial = std::stoull(argv[3]);
+    std::string ref_lib_path = argv[1];
+    std::string dev_lib_path = argv[2];
+
+    auto ref_lib = dlopen(ref_lib_path.c_str(), RTLD_LAZY);
+    auto dev_lib = dlopen(dev_lib_path.c_str(), RTLD_LAZY);
+
+    auto ref_zgesv = reinterpret_cast<decltype(&rocsolver_zgesv)>(dlsym(ref_lib, "rocsolver_zgesv"));
+    auto dev_zgesv = reinterpret_cast<decltype(&rocsolver_zgesv)>(dlsym(dev_lib, "rocsolver_zgesv"));
+
+    size_t ntrial = std::stoull(argv[5]);
 
     // define double complex type
     H5::CompType ztype(sizeof(double) * 2);
@@ -23,8 +35,8 @@ int main(int argc, char** argv)
     ztype.insertMember("imag", sizeof(double), H5::PredType::NATIVE_DOUBLE);
 
     // load files
-    H5::H5File kkr(argv[1], H5F_ACC_RDONLY);
-    H5::H5File t(argv[2], H5F_ACC_RDONLY);
+    H5::H5File kkr(argv[3], H5F_ACC_RDONLY);
+    H5::H5File t(argv[4], H5F_ACC_RDONLY);
 
     auto kkrmat = kkr.openDataSet("kkrmat");
     auto tmat = t.openDataSet("tmat");
@@ -106,71 +118,79 @@ int main(int argc, char** argv)
     hipEvent_wrapper_t start, stop;
     start.alloc();
     stop.alloc();
-    std::vector<float> gpu_time(ntrial);
+    std::vector<float> ref_gpu_time(ntrial);
+    std::vector<float> dev_gpu_time(ntrial);
     for(size_t i = 0; i < ntrial; ++i)
     {
-        // copy to device
-        if(hipMemcpy(kkrmat_data_device.data(), kkrmat_data_host.get(), kkrmat.getInMemDataSize(),
-                     hipMemcpyHostToDevice)
-           != hipSuccess)
-            throw std::runtime_error("failed to memcpy kkr to device");
-        if(hipMemcpy(tmat_data_device.data(), tmat_data_pad_host.get(),
-                     kkrmat_dims[0] * tmat_dims[0] * sizeof(rocblas_double_complex),
-                     hipMemcpyHostToDevice)
-           != hipSuccess)
-            throw std::runtime_error("failed to memcpy t to device");
+        for(auto run_ref : {true, false})
+        {
+            auto zgesv = run_ref ? ref_zgesv : dev_zgesv;
+            auto& gpu_time = run_ref ? ref_gpu_time : dev_gpu_time;
 
-        if(hipMemset(ipiv.data(), -1, ipiv.size()) != hipSuccess)
-            throw std::runtime_error("failed to init ipiv");
+            // copy to device
+            if(hipMemcpy(kkrmat_data_device.data(), kkrmat_data_host.get(),
+                         kkrmat.getInMemDataSize(), hipMemcpyHostToDevice)
+               != hipSuccess)
+                throw std::runtime_error("failed to memcpy kkr to device");
+            if(hipMemcpy(tmat_data_device.data(), tmat_data_pad_host.get(),
+                         kkrmat_dims[0] * tmat_dims[0] * sizeof(rocblas_double_complex),
+                         hipMemcpyHostToDevice)
+               != hipSuccess)
+                throw std::runtime_error("failed to memcpy t to device");
 
-        if(hipMemset(info.data(), -1, info.size()) != hipSuccess)
-            throw std::runtime_error("failed to init info");
+            if(hipMemset(ipiv.data(), -1, ipiv.size()) != hipSuccess)
+                throw std::runtime_error("failed to init ipiv");
 
-        (void)hipDeviceSynchronize();
+            if(hipMemset(info.data(), -1, info.size()) != hipSuccess)
+                throw std::runtime_error("failed to init info");
 
-        if(hipEventRecord(start) != hipSuccess)
-            throw std::runtime_error("failed to record start event");
+            (void)hipDeviceSynchronize();
 
-        // solve
-        auto status = rocsolver_zgesv(handle, kkrmat_dims[0], tmat_dims[0],
-                                      kkrmat_data_device.data(), kkrmat_dims[1], ipiv.data(),
-                                      tmat_data_device.data(), kkrmat_dims[1], info.data());
+            if(hipEventRecord(start) != hipSuccess)
+                throw std::runtime_error("failed to record start event");
 
-        if(hipEventRecord(stop) != hipSuccess)
-            throw std::runtime_error("failed to record stop event");
-        if(hipEventSynchronize(stop) != hipSuccess)
-            throw std::runtime_error("hipEventSynchronize failed");
+            // solve
+            auto status = zgesv(handle, kkrmat_dims[0], tmat_dims[0], kkrmat_data_device.data(),
+                                kkrmat_dims[1], ipiv.data(), tmat_data_device.data(),
+                                kkrmat_dims[1], info.data());
 
-        float time;
-        if(hipEventElapsedTime(&time, start, stop) != hipSuccess)
-            throw std::runtime_error("hipEventElapsedTime failed");
-        gpu_time[i] = time;
+            if(hipEventRecord(stop) != hipSuccess)
+                throw std::runtime_error("failed to record stop event");
+            if(hipEventSynchronize(stop) != hipSuccess)
+                throw std::runtime_error("hipEventSynchronize failed");
 
-        rocblas_int info_host;
-        if(hipMemcpy(&info_host, info.data(), sizeof(rocblas_int), hipMemcpyDeviceToHost)
-           != hipSuccess)
-            throw std::runtime_error("failed to copy info back");
+            float time;
+            if(hipEventElapsedTime(&time, start, stop) != hipSuccess)
+                throw std::runtime_error("hipEventElapsedTime failed");
+            gpu_time[i] = time;
 
-        printf("trial %zu info=%d status=%d\n", i, info_host, status);
+            rocblas_int info_host;
+            if(hipMemcpy(&info_host, info.data(), sizeof(rocblas_int), hipMemcpyDeviceToHost)
+               != hipSuccess)
+                throw std::runtime_error("failed to copy info back");
+
+            printf("%s trial %zu info=%d status=%d\n", run_ref ? "ref" : "dev", i, info_host, status);
+        }
     }
 
     rocblas_destroy_handle(handle);
     handle = nullptr;
 
-    printf("Execution times (ms):");
-    for(auto t : gpu_time)
+    for(auto run_ref : {true, false})
     {
-        printf(" %.2f", static_cast<double>(t));
-    }
+        auto& gpu_time = run_ref ? ref_gpu_time : dev_gpu_time;
+        auto name = run_ref ? "Ref" : "Dev";
 
-    std::sort(gpu_time.begin(), gpu_time.end());
-    if(ntrial % 2)
-    {
-        printf("\nMedian time (ms): %.2f\n", gpu_time[ntrial / 2]);
-    }
-    else
-    {
-        printf("\nMedian time (ms): %.2f\n", (gpu_time[ntrial / 2] + gpu_time[ntrial / 2 + 1]) / 2);
+        printf("%s execution times (ms):", name);
+        for(auto t : gpu_time)
+        {
+            printf(" %.2f", static_cast<double>(t));
+        }
+
+        std::sort(gpu_time.begin(), gpu_time.end());
+        auto median = ntrial % 2 ? gpu_time[ntrial / 2]
+                                 : (gpu_time[ntrial / 2] + gpu_time[ntrial / 2 + 1]) / 2;
+        printf("\n%s median time (ms): %.2f\n", name, median);
     }
 
     return 0;
