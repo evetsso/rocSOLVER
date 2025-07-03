@@ -716,6 +716,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
         if(pivot || panel)
         {
             // factorize outer block panel
+            (void)hipDeviceSynchronize();
             roctxMark(std::string("panel " + iter_str).c_str());
             getrf_panelLU<BATCHED, STRIDED, T>(handle, m - j, jb, n, A, shiftA + j * inca, inca,
                                                lda, strideA, ipiv, shiftP + j, strideP, info,
@@ -744,6 +745,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
         nn = n - nextpiv; //size for the matrix update
         if(nextpiv < n)
         {
+            (void)hipDeviceSynchronize();
             roctxMark(std::string("trsm " + iter_str).c_str());
             rocsolver_trsm_lower<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_unit, jb, nn, A,
@@ -753,6 +755,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
 
             if(nextpiv < m)
             {
+                (void)hipDeviceSynchronize();
                 roctxMark(std::string("gemm " + iter_str).c_str());
                 rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, mm, nn, jb,
                                &minone, A, shiftA + idx2D(nextpiv, j, inca, lda), inca, lda,
@@ -761,6 +764,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
                                lda, strideA, batch_count, (T**)nullptr);
             }
         }
+        (void)hipDeviceSynchronize();
         roctxMark(std::string("end " + iter_str).c_str());
         ++getrf_iter;
     }
