@@ -190,6 +190,28 @@ int main(int argc, char** argv)
                              hipMemcpyDeviceToHost)
                    != hipSuccess)
                     throw std::runtime_error("failed to memcpy output");
+
+		if(!run_ref)
+		  {
+		// also check convergence of dev solution while we're here
+		    // original kkr is A
+		    auto& A = kkrmat_data_device;
+		    // reconstruct B from padded tmat
+		    gpubuf B;
+		    B.alloc(tmat_data_device.size());
+		    if(hipMemcpy(B.data(), tmat_data_pad_host.get(),
+				 B.size(),
+				 hipMemcpyHostToDevice)
+		       != hipSuccess)
+		      throw std::runtime_error("failed to memcpy t to device");
+		    // X was written to tmat
+		    auto& X = tmat_data_device;
+
+		// compute residual: R = B - A * X, store it in B
+		    rocblas_zgemm(handle, rocblas_operation_none, rocblas_operation_none, );
+
+		    // compute norm
+		  }
             }
         }
     }

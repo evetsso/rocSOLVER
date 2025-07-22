@@ -37,10 +37,10 @@
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
 
+#include <optional>
 #include <rocprofiler-sdk-roctx/roctx.h>
 #include <stdlib.h>
 #include <string>
-#include <optional>
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -202,7 +202,7 @@ template <typename T, typename I>
 ROCSOLVER_KERNEL void __launch_bounds__(64)
     getrf_max_value(const T* A, const I m, const I n, T* max_value)
 {
-  // seems like rocblas_i?amax should solve this for us
+    // seems like rocblas_i?amax should solve this for us
 }
 
 template <typename Treal, typename Tcomplex, typename Tscale, typename I>
@@ -220,55 +220,55 @@ ROCSOLVER_KERNEL void __launch_bounds__(64) getrf_planar_to_interleaved(const Tr
                                                                         const Treal* Aimag,
                                                                         const I m,
                                                                         const I n,
-									const Tscale,
+                                                                        const Tscale,
                                                                         Tcomplex* A)
 {
 }
 
-template<typename T, typename I>
+template <typename T, typename I>
 struct mixed_precision_getrf
 {
-  static std::optional<mixed_precision_getrf> get(const I m, const I n, const I k, T A)
-  {
-    if constexpr(std::is_same<T,rocblas_double_complex>())
-      {
-	return std::make_optional<mixed_precision_getrf>(m,n,k,A);
-      }
-    else
-      {
-	return std::nullopt;
-      }
-  }
-  rocblas_device_malloc mem;
-  void* A_fp32_r = nullptr;
-  void* A_fp32_i = nullptr;
-  void* panelA_fp16_r = nullptr;
-  void* panelA_fp16_i = nullptr;
-  void* panelB_fp16_r = nullptr;
-  void* panelB_fp16_i = nullptr;
-  void* A = nullptr;
+    static std::optional<mixed_precision_getrf> get(const I m, const I n, const I k, T A)
+    {
+        if constexpr(std::is_same<T, rocblas_double_complex>())
+        {
+            return std::make_optional<mixed_precision_getrf>(m, n, k, A);
+        }
+        else
+        {
+            return std::nullopt;
+        }
+    }
+    rocblas_device_malloc mem;
+    void* A_fp32_r = nullptr;
+    void* A_fp32_i = nullptr;
+    void* panelA_fp16_r = nullptr;
+    void* panelA_fp16_i = nullptr;
+    void* panelB_fp16_r = nullptr;
+    void* panelB_fp16_i = nullptr;
+    void* A = nullptr;
 
 private:
-  mixed_precision_getrf(const I m, const I n, const I k, T A)
-    : mem(m*n*sizeof(float),
-	  m*n*sizeof(float),
-	  m*k*sizeof(rocblas_half),
-	  m*k*sizeof(rocblas_half),
-	  k*n*sizeof(rocblas_half),
-	  k*n*sizeof(rocblas_half)),
-      A(A)
-  {
-    A_fp32_r = mem[0];
-    A_fp32_i = mem[1];
-    panelA_fp16_r = mem[2];
-    panelA_fp16_i = mem[3];
-    panelB_fp16_r = mem[4];
-    panelB_fp16_i = mem[5];
+    mixed_precision_getrf(const I m, const I n, const I k, T A)
+        : mem(m * n * sizeof(float),
+              m * n * sizeof(float),
+              m * k * sizeof(rocblas_half),
+              m * k * sizeof(rocblas_half),
+              k * n * sizeof(rocblas_half),
+              k * n * sizeof(rocblas_half))
+        , A(A)
+    {
+        A_fp32_r = mem[0];
+        A_fp32_i = mem[1];
+        panelA_fp16_r = mem[2];
+        panelA_fp16_i = mem[3];
+        panelB_fp16_r = mem[4];
+        panelB_fp16_i = mem[5];
 
-    // get max magnitude of A, so we know how to scale values to fit into fp16
-    
-    // init fp32 copy of A
-  }
+        // get max magnitude of A, so we know how to scale values to fit into fp16
+
+        // init fp32 copy of A
+    }
 };
 
 /** Execute all permutations dictated by the panel factorization
@@ -693,7 +693,7 @@ void rocsolver_getrf_getMemorySize(const I m,
             size_t w1, w2, w3, w4;
             rocsolver_trsm_mem<BATCHED, STRIDED, T>(rocblas_side_right, rocblas_operation_none, m,
                                                     dim, batch_count, &w1, &w2, &w3, &w4, optim_mem,
-						    true, lda, lda, inca, inca);
+                                                    true, lda, lda, inca, inca);
             *size_work1 = std::max(*size_work1, w1);
             *size_work2 = std::max(*size_work2, w2);
             *size_work3 = std::max(*size_work3, w3);
@@ -727,7 +727,7 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
                                         INFO* iinfo,
                                         const bool optim_mem,
                                         const bool pivot,
-					const bool allow_mixed_precision = false)
+                                        const bool allow_mixed_precision = false)
 {
     ROCSOLVER_ENTER("getrf", "m:", m, "n:", n, "shiftA:", shiftA, "inca:", inca, "lda:", lda,
                     "shiftP:", shiftP, "bc:", batch_count);
@@ -763,10 +763,10 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
                                                       ipiv, shiftP, strideP, info, batch_count,
                                                       scalars, pivotval, pivotidx, pivot);
 
-    std::optional<mixed_precision_getrf<U,I>> mp_getrf;
+    std::optional<mixed_precision_getrf<U, I>> mxp_getrf;
     if(allow_mixed_precision)
-      mp_getrf = mixed_precision_getrf<U,I>::get(m,n,blk,A);
-    
+        mxp_getrf = mixed_precision_getrf<U, I>::get(m, n, blk, A);
+
     // everything must be executed with scalars on the host
     rocblas_pointer_mode old_mode;
     rocblas_get_pointer_mode(handle, &old_mode);
