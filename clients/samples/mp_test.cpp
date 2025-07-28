@@ -217,7 +217,7 @@ int main(int argc, char** argv)
                     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
                     auto status = rocblas_zgemm(
                         handle, rocblas_operation_none, rocblas_operation_none, kkrmat_dims[0],
-                        kkrmat_dims[1], kkrmat_dims[0], &alpha, A.data(), kkrmat_dims[0], X.data(),
+                        tmat_dims[0], kkrmat_dims[1], &alpha, A.data(), kkrmat_dims[0], X.data(),
                         kkrmat_dims[0], &beta, B.data(), kkrmat_dims[0]);
 
                     if(status != rocblas_status_success)
