@@ -11,6 +11,7 @@
 
 #include "gpubuf.h"
 #include "hip_object_wrapper.h"
+#include "rocblas/rocblas.h"
 #include "rocsolver/rocsolver.h"
 
 #include <dlfcn.h>
@@ -191,27 +192,57 @@ int main(int argc, char** argv)
                    != hipSuccess)
                     throw std::runtime_error("failed to memcpy output");
 
-		if(!run_ref)
-		  {
-		// also check convergence of dev solution while we're here
-		    // original kkr is A
-		    auto& A = kkrmat_data_device;
-		    // reconstruct B from padded tmat
-		    gpubuf B;
-		    B.alloc(tmat_data_device.size());
-		    if(hipMemcpy(B.data(), tmat_data_pad_host.get(),
-				 B.size(),
-				 hipMemcpyHostToDevice)
-		       != hipSuccess)
-		      throw std::runtime_error("failed to memcpy t to device");
-		    // X was written to tmat
-		    auto& X = tmat_data_device;
+                if(!run_ref)
+                {
+                    // also check convergence of dev solution while we're here
 
-		// compute residual: R = B - A * X, store it in B
-		    rocblas_zgemm(handle, rocblas_operation_none, rocblas_operation_none, );
+                    // original kkr is A
+                    auto& A = kkrmat_data_device;
+                    // reconstruct B from padded tmat
+                    gpubuf_t<rocblas_double_complex> B;
+                    if(B.alloc(tmat_data_device.size()) != hipSuccess)
+                        throw std::runtime_error("failed to alloc B");
+                    if(hipMemcpy(B.data(), tmat_data_pad_host.get(), B.size(), hipMemcpyHostToDevice)
+                       != hipSuccess)
+                        throw std::runtime_error("failed to re-memcpy to device");
 
-		    // compute norm
-		  }
+                    // X was written to tmat
+                    auto& X = tmat_data_device;
+
+                    // compute residual: R = B - A * X, store it in B
+                    const rocblas_double_complex alpha{1, 0};
+                    const rocblas_double_complex beta{-1, 0};
+                    auto status = rocblas_zgemm(
+                        handle, rocblas_operation_none, rocblas_operation_none, kkrmat_dims[0],
+                        kkrmat_dims[1], kkrmat_dims[0], &alpha, A.data(), kkrmat_dims[0], X.data(),
+                        kkrmat_dims[0], &beta, B.data(), kkrmat_dims[0]);
+
+                    if(status != rocblas_status_success)
+                    {
+                        throw std::runtime_error("gemm failed");
+                    }
+
+                    // compute norm
+                    auto residual_host
+                        = std::make_unique<rocblas_double_complex[]>(kkrmat_dims[0] * kkrmat_dims[1]);
+                    if(hipMemcpy(residual_host.get(), B.data(), B.size(), hipMemcpyDeviceToHost)
+                       != hipSuccess)
+                        throw std::runtime_error("failed to copy residual back");
+
+                    double l_inf = 0.0;
+                    double l_2 = 0.0;
+#pragma omp parallel for reduction(max : l_inf) reduction(+ : l_2)
+                    for(size_t i = 0; i < kkrmat_dims[0] * kkrmat_dims[1]; ++i)
+                    {
+                        double rdiff = std::abs(residual_host[i].x);
+                        l_inf = std::max(rdiff, l_inf);
+                        double idiff = std::abs(residual_host[i].y);
+                        l_inf = std::max(idiff, l_inf);
+                        l_2 += rdiff * rdiff + idiff * idiff;
+                    }
+                    l_2 = sqrt(l_2);
+                    printf("Residual L2=%e, L-inf=%e\n", l_2, l_inf);
+                }
             }
         }
     }
