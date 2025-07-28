@@ -229,19 +229,35 @@ int main(int argc, char** argv)
                        != hipSuccess)
                         throw std::runtime_error("failed to copy residual back");
 
-                    double l_inf = 0.0;
-                    double l_2 = 0.0;
-#pragma omp parallel for reduction(max : l_inf) reduction(+ : l_2)
+                    double l_inf_r = 0.0;
+                    double l_2_r = 0.0;
+#pragma omp parallel for reduction(max : l_inf_r) reduction(+ : l_2_r)
                     for(size_t i = 0; i < kkrmat_dims[0] * kkrmat_dims[1]; ++i)
                     {
                         double rdiff = std::abs(residual_host[i].x);
-                        l_inf = std::max(rdiff, l_inf);
+                        l_inf_r = std::max(rdiff, l_inf_r);
                         double idiff = std::abs(residual_host[i].y);
-                        l_inf = std::max(idiff, l_inf);
-                        l_2 += rdiff * rdiff + idiff * idiff;
+                        l_inf_r = std::max(idiff, l_inf_r);
+                        l_2_r += rdiff * rdiff + idiff * idiff;
                     }
-                    l_2 = sqrt(l_2);
-                    printf("Residual L2=%e, L-inf=%e\n", l_2, l_inf);
+                    l_2_r = sqrt(l_2_r);
+                    printf("Residual L2=%e, L-inf=%e\n", l_2_r, l_inf_r);
+
+                    double l_inf_b = 0.0;
+                    double l_2_b = 0.0;
+#pragma omp parallel for reduction(max : l_inf_b) reduction(+ : l_2_b)
+                    for(size_t i = 0; i < kkrmat_dims[0] * tmat_dims[0]; ++i)
+                    {
+                        double rdiff = std::abs(tmat_data_pad_host[i].x);
+                        l_inf_r = std::max(rdiff, l_inf_r);
+                        double idiff = std::abs(tmat_data_pad_host[i].y);
+                        l_inf_r = std::max(idiff, l_inf_r);
+                        l_2_r += rdiff * rdiff + idiff * idiff;
+                    }
+                    l_2_r = sqrt(l_2_r);
+                    printf("B L2=%e, B=%e\n", l_2_r, l_inf_r);
+
+                    printf("R/B L2=%e, B=%e\n", l_2_b / l_2_r, l_inf_b / l_inf_r);
                 }
             }
         }
