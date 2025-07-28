@@ -210,8 +210,8 @@ int main(int argc, char** argv)
                     auto& X = tmat_data_device;
 
                     // compute residual: R = B - A * X, store it in B
-                    const rocblas_double_complex alpha{1, 0};
-                    const rocblas_double_complex beta{-1, 0};
+                    const rocblas_double_complex alpha{-1, 0};
+                    const rocblas_double_complex beta{1, 0};
                     auto status = rocblas_zgemm(
                         handle, rocblas_operation_none, rocblas_operation_none, kkrmat_dims[0],
                         tmat_dims[0], kkrmat_dims[1], &alpha, A.data(), kkrmat_dims[0], X.data(),
