@@ -212,6 +212,9 @@ int main(int argc, char** argv)
                     // compute residual: R = B - A * X, store it in B
                     const rocblas_double_complex alpha{1, 0};
                     const rocblas_double_complex beta{-1, 0};
+                    rocblas_pointer_mode old_mode;
+                    rocblas_get_pointer_mode(handle, &old_mode);
+                    rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
                     auto status = rocblas_zgemm(
                         handle, rocblas_operation_none, rocblas_operation_none, kkrmat_dims[0],
                         kkrmat_dims[1], kkrmat_dims[0], &alpha, A.data(), kkrmat_dims[0], X.data(),
@@ -221,6 +224,8 @@ int main(int argc, char** argv)
                     {
                         throw std::runtime_error("gemm failed");
                     }
+
+                    rocblas_set_pointer_mode(handle, old_mode);
 
                     // compute norm
                     auto residual_host
