@@ -157,6 +157,10 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
                                        rocblas_int* iinfo,
                                        bool optim_mem)
 {
+    static int gesv_iter = 0;
+    std::string iter_str = std::to_string(gesv_iter);
+    ++gesv_iter;
+
     ROCSOLVER_ENTER("gesv", "n:", n, "nrhs:", nrhs, "shiftA:", shiftA, "lda:", lda,
                     "shiftB:", shiftB, "ldb:", ldb, "bc:", batch_count);
 
@@ -181,9 +185,6 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     // constants in host memory
     const rocblas_int copyblocksx = (n - 1) / 32 + 1;
     const rocblas_int copyblocksy = (nrhs - 1) / 32 + 1;
-
-    static int gesv_iter = 0;
-    std::string iter_str = std::to_string(gesv_iter);
 
     // compute LU factorization of A
     (void)hipDeviceSynchronize();

@@ -761,6 +761,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
 {
     static int gesv_iter = 0;
     std::string iter_str = std::to_string(gesv_iter);
+    ++gesv_iter;
 
     ROCSOLVER_ENTER("gesv_ex_mxp_lu", "n:", n, "nrhs:", nrhs, "shiftA", shiftA, "lda:", lda,
                     "strideA", strideA, "strideP", strideP, "shiftB", shiftB, "ldb:", ldb,
