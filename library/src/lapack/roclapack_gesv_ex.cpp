@@ -796,8 +796,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     auto ceil = [](auto n, auto b) { return ((n - 1) / b + 1); };
 
     size_t size_work = 0;
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex get memory begin " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex get memory begin " + iter_str).c_str());
     rocsolver_gesv_mxp_getMemorySize<Tfull, LU, Treduced, rocblas_int>(n, nrhs, batch_count,
                                                                        &size_work);
     if(rocblas_is_device_memory_size_query(handle))
@@ -817,8 +816,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     // reset info
     // ----------
 
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex reset begin " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex reset begin " + iter_str).c_str());
     ROCSOLVER_LAUNCH_KERNEL(reset_info, dim3(ceil(batch_count, BS1), 1, 1), dim3(BS1, 1, 1), 0,
                             stream, info, batch_count, 0);
 
@@ -870,8 +868,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     // copy A into A_lu
     // ----------------
     {
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex lacpy begin " + iter_str).c_str());
+        rocsolver_txmark(std::string("gesv_ex lacpy begin " + iter_str).c_str());
         char const uplo = 'A';
         ROCBLAS_CHECK(rocsolver_lacpy_template(handle, uplo, nrows_A, ncols_A,
 
@@ -893,8 +890,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     // ------------------------
     // perform LU factorization
     // ------------------------
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex getrf begin " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex getrf begin " + iter_str).c_str());
 
     bool const use_mixed_precision = !std::is_same<T, LU>::value;
     if(use_mixed_precision)
@@ -1037,8 +1033,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
         return (istat);
     }; // end solve_rhs()
 
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex getrs begin " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex getrs begin " + iter_str).c_str());
     ROCBLAS_CHECK(solve_rhs());
 
     // --------------------
@@ -1047,8 +1042,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     {
         char const uplo = 'A';
 
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex lacpy 2 begin " + iter_str).c_str());
+        rocsolver_txmark(std::string("gesv_ex lacpy 2 begin " + iter_str).c_str());
         ROCBLAS_CHECK(rocsolver_lacpy_template(handle, uplo, nrows_B, ncols_B, B_lu, shiftB_lu, ldB_lu,
                                                strideB_lu, X, shiftX, ldx, strideX, batch_count));
     }
@@ -1121,15 +1115,13 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
         return (istat);
     }; // end compute_residual()
 
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex residual begin " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex residual begin " + iter_str).c_str());
     ROCBLAS_CHECK(compute_residual());
 
     int is_all_converged = false;
     bool const use_check_convergence_host = false;
 
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex check begin " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex check begin " + iter_str).c_str());
     {
         if(use_check_convergence_host)
         {
@@ -1172,8 +1164,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     for(iter = 0; iter < max_iter; iter++)
     {
         std::string loop_str = std::to_string(iter);
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex lacpy begin " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(std::string("gesv_ex lacpy begin " + iter_str + " loop " + loop_str).c_str());
         // ---------------------------
         // convert R from FP64 to FP32
         // ---------------------------
@@ -1192,8 +1183,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
         // solve for "dx" correction
         // answer over-writes B_lu
         // -------------------------
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex solve begin " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(std::string("gesv_ex solve begin " + iter_str + " loop " + loop_str).c_str());
         ROCBLAS_CHECK(solve_rhs());
 
         // ------------
@@ -1244,16 +1234,16 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
             return (rocblas_status_success);
         }; // end update_X()
 
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex update begin " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(
+            std::string("gesv_ex update begin " + iter_str + " loop " + loop_str).c_str());
         ROCBLAS_CHECK(update_X());
 
         // ---------------
         // compute residual R
         // using latest version of X
         // ---------------
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex residual begin " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(
+            std::string("gesv_ex residual begin " + iter_str + " loop " + loop_str).c_str());
         ROCBLAS_CHECK(compute_residual());
 
         // ---------
@@ -1261,8 +1251,8 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
         // ---------
         {
             char const uplo = 'A';
-            (void)hipDeviceSynchronize();
-            roctxMark(std::string("gesv_ex lacpy 2 begin " + iter_str + " loop " + loop_str).c_str());
+            rocsolver_txmark(
+                std::string("gesv_ex lacpy 2 begin " + iter_str + " loop " + loop_str).c_str());
             ROCBLAS_CHECK(rocsolver_lacpy_template(handle, uplo, nrows_B, ncols_B,
 
                                                    R, shiftR, ldr, strideR,
@@ -1276,8 +1266,8 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
         // compute correction "dx"
         // dx over-writes B_lu
         // -----------------------
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex solve 2 begin " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(
+            std::string("gesv_ex solve 2 begin " + iter_str + " loop " + loop_str).c_str());
         ROCBLAS_CHECK(solve_rhs());
 
         // -----------------
@@ -1286,8 +1276,8 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
 
         int is_all_converged = false;
 
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex check 2 begin " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(
+            std::string("gesv_ex check 2 begin " + iter_str + " loop " + loop_str).c_str());
         {
             if(use_check_convergence_host)
             {
@@ -1323,8 +1313,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
             }
         }
 
-        (void)hipDeviceSynchronize();
-        roctxMark(std::string("gesv_ex done " + iter_str + " loop " + loop_str).c_str());
+        rocsolver_txmark(std::string("gesv_ex done " + iter_str + " loop " + loop_str).c_str());
         if(is_all_converged)
         {
             *niter = iter;
@@ -1351,8 +1340,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
     // --------------
     pfree = pwork;
 
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex fail " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex fail " + iter_str).c_str());
     {
         bool constexpr BATCHED = false;
         bool constexpr STRIDED = false;
@@ -1448,8 +1436,7 @@ rocblas_status rocsolver_gesv_ex_mxp_lu(rocblas_handle handle,
         }
     }
 
-    (void)hipDeviceSynchronize();
-    roctxMark(std::string("gesv_ex fail end " + iter_str).c_str());
+    rocsolver_txmark(std::string("gesv_ex fail end " + iter_str).c_str());
 
     return (rocblas_status_success);
 }

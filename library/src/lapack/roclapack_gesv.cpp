@@ -107,6 +107,16 @@ rocblas_status rocsolver_gesv_impl(rocblas_handle handle,
         (rocblas_int*)pivotidx, (rocblas_int*)iipiv, (rocblas_int*)iinfo, optim_mem);
 }
 
+void rocsolver_txmark(const char* msg)
+{
+    static bool enable_txmark = std::getenv("ROCSOLVER_ROCTX_TRACE");
+    if(enable_txmark)
+    {
+        (void)hipDeviceSynchronize();
+        roctxMark(msg);
+    }
+}
+
 ROCSOLVER_END_NAMESPACE
 
 /*
