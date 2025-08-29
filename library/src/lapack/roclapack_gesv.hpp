@@ -44,11 +44,17 @@ ROCSOLVER_BEGIN_NAMESPACE
 
 struct tx_range
 {
+    static bool enabled()
+    {
+        static bool enable_txmark = std::getenv("ROCSOLVER_ROCTX_TRACE");
+        return enable_txmark;
+        ;
+    }
+
     tx_range() = default;
     void mark(const char* msg)
     {
-        static bool enable_txmark = std::getenv("ROCSOLVER_ROCTX_TRACE");
-        if(!enable_txmark)
+        if(!enabled())
             return;
 
         (void)hipDeviceSynchronize();
@@ -59,6 +65,10 @@ struct tx_range
     }
     ~tx_range()
     {
+        if(!enabled())
+            return;
+
+        (void)hipDeviceSynchronize();
         if(needPop)
             roctxRangePop();
     }
