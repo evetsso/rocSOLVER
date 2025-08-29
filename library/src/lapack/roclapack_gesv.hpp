@@ -42,7 +42,28 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-void rocsolver_txmark(const char* msg);
+struct tx_range
+{
+    tx_range() = default;
+    void mark(const char* msg)
+    {
+        static bool enable_txmark = std::getenv("ROCSOLVER_ROCTX_TRACE");
+        if(!enable_txmark)
+            return;
+
+        (void)hipDeviceSynchronize();
+        if(needPop)
+            roctxRangePop();
+        needPop = true;
+        roctxRangePush(msg);
+    }
+    ~tx_range()
+    {
+        if(needPop)
+            roctxRangePop();
+    }
+    bool needPop = false;
+};
 
 template <typename T>
 rocblas_status rocsolver_gesv_argCheck(rocblas_handle handle,
@@ -189,30 +210,29 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     const rocblas_int copyblocksy = (nrhs - 1) / 32 + 1;
 
     // compute LU factorization of A
-    rocsolver_txmark(std::string("gesv getrf begin " + iter_str).c_str());
+    tx_range tx;
+    tx.mark(std::string("gesv getrf " + iter_str).c_str());
     rocsolver_getrf_template<BATCHED, STRIDED, T>(
         handle, n, n, A, shiftA, 1, lda, strideA, ipiv, 0, strideP, info, batch_count, scalars,
         work1, work2, work3, work4, pivotval, pivotidx, iipiv, iinfo, optim_mem, true);
 
     // save elements of B that will be overwritten by GETRS for cases where info is nonzero
-    rocsolver_txmark(std::string("gesv copy_mat begin " + iter_str).c_str());
+    tx.mark(std::string("gesv copy_mat " + iter_str).c_str());
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
                             0, stream, copymat_to_buffer, n, nrhs, B, shiftB, ldb, strideB,
                             (T*)work, info_mask(info));
 
     // solve AX = B, overwriting B with X
-    rocsolver_txmark(std::string("gesv getrs begin " + iter_str).c_str());
+    tx.mark(std::string("gesv getrs " + iter_str).c_str());
     rocsolver_getrs_template<BATCHED, STRIDED, T>(
         handle, rocblas_operation_none, n, nrhs, A, shiftA, 1, lda, strideA, ipiv, strideP, B,
         shiftB, 1, ldb, strideB, batch_count, work1, work2, work3, work4, optim_mem, true);
 
     // restore elements of B that were overwritten by GETRS in cases where info is nonzero
-    rocsolver_txmark(std::string("gesv copy_mat 2 begin " + iter_str).c_str());
+    tx.mark(std::string("gesv copy_mat 2 " + iter_str).c_str());
     ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocksx, copyblocksy, batch_count), dim3(32, 32),
                             0, stream, copymat_from_buffer, n, nrhs, B, shiftB, ldb, strideB,
                             (T*)work, info_mask(info));
-
-    rocsolver_txmark(std::string("gesv end " + iter_str).c_str());
     return rocblas_status_success;
 }
 
