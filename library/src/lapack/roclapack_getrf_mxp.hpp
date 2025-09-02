@@ -45,9 +45,7 @@
 
 #include "roclapack_getrf.hpp"
 
-#include "auxiliary/rocauxiliary_amax_matrix.hpp"
 #include "auxiliary/rocauxiliary_complex2reim.hpp"
-#include "auxiliary/rocauxiliary_complex2reim_inplace.hpp"
 #include "auxiliary/rocauxiliary_gemm_ex.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE

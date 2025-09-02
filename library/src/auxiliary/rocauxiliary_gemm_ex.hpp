@@ -42,7 +42,6 @@
 #include "lib_host_helpers.hpp"
 
 #include "auxiliary/rocauxiliary_complex2reim.hpp"
-#include "auxiliary/rocauxiliary_complex2reim_inplace.hpp"
 #include "auxiliary/rocauxiliary_lacpy.hpp"
 #include "lapack/roclapack_gesv_ex.hpp"
 
@@ -676,15 +675,15 @@ static rocblas_status rocblasCall_gemm_strided_batched_ex_impl(rocblas_handle ha
         // -------------------------------------------------------
 
         {
-            reim2complex_outofplace_simple(handle, nrows_C, ncols_C,
+            reim2complex_outofplace(handle, nrows_C, ncols_C,
 
-                                           C_re, shift_C_re, ldC_re, stride_C_re,
+                                    C_re, shift_C_re, ldC_re, stride_C_re,
 
-                                           C_im, shift_C_im, ldC_im, stride_C_im,
+                                    C_im, shift_C_im, ldC_im, stride_C_im,
 
-                                           C, shift_C, ldC, stride_C,
+                                    C, shift_C, ldC, stride_C,
 
-                                           batch_count);
+                                    batch_count, 0.0, {}, {});
         }
     }
 

@@ -489,32 +489,11 @@ if(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER)
   target_compile_definitions(rocsolver PRIVATE ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER)
 endif()
 
-add_executable(gemm_ex_test
-  gemm_ex_test.cpp
+target_compile_definitions(rocsolver PRIVATE
+  ROCM_USE_FLOAT16
+  ROCBLAS_INTERNAL_API
+  ROCSOLVER_LIBRARY
 )
-target_include_directories(gemm_ex_test
-  PRIVATE
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/include>
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src>
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/include>
-  $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include/rocsolver>
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/common/include>
-)
-find_package(rocthrust REQUIRED)
-target_link_libraries(gemm_ex_test
-  PRIVATE
-  roc::rocblas
-  rocsolver
-  hip::device
-  roc::rocthrust
-)
-foreach(target rocsolver gemm_ex_test)
-  target_compile_definitions(${target} PRIVATE
-    ROCM_USE_FLOAT16
-    ROCBLAS_INTERNAL_API
-    ROCSOLVER_LIBRARY
-  )
-endforeach()
 
 add_armor_flags(rocsolver "${ARMOR_LEVEL}")
 
@@ -563,3 +542,4 @@ rocm_export_targets(
     ${static_depends}
   NAMESPACE roc::
 )
+
