@@ -507,6 +507,7 @@ target_link_libraries(gemm_ex_test
   rocsolver
   hip::device
   roc::rocthrust
+  fmt::fmt
 )
 foreach(target rocsolver gemm_ex_test)
   target_compile_definitions(${target} PRIVATE

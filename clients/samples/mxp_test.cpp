@@ -266,9 +266,9 @@ int main(int argc, char** argv)
 #pragma omp parallel for reduction(max : l_inf_r) reduction(+ : l_2_r)
                 for(size_t i = 0; i < kkrmat_dims[0] * kkrmat_dims[1]; ++i)
                 {
-                    double rdiff = std::abs(residual_host[i].x);
+                    double rdiff = std::abs(residual_host[i].real());
                     l_inf_r = std::max(rdiff, l_inf_r);
-                    double idiff = std::abs(residual_host[i].y);
+                    double idiff = std::abs(residual_host[i].imag());
                     l_inf_r = std::max(idiff, l_inf_r);
                     l_2_r += rdiff * rdiff + idiff * idiff;
                 }
@@ -280,9 +280,9 @@ int main(int argc, char** argv)
 #pragma omp parallel for reduction(max : l_inf_b) reduction(+ : l_2_b)
                 for(size_t i = 0; i < kkrmat_dims[0] * tmat_dims[0]; ++i)
                 {
-                    double rdiff = std::abs(tmat_data_pad_host[i].x);
+                    double rdiff = std::abs(tmat_data_pad_host[i].real());
                     l_inf_b = std::max(rdiff, l_inf_b);
-                    double idiff = std::abs(tmat_data_pad_host[i].y);
+                    double idiff = std::abs(tmat_data_pad_host[i].imag());
                     l_inf_b = std::max(idiff, l_inf_b);
                     l_2_b += rdiff * rdiff + idiff * idiff;
                 }
